@@ -1,8 +1,10 @@
 VERSION = 3
 PATCHLEVEL = 0
-SUBLEVEL = 15
+SUBLEVEL = 40
 EXTRAVERSION =
 NAME = Sneaky Weasel
+
+# merge google android-3.0(Linux 3.0.50) 
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
@@ -192,8 +194,14 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
 # Default value for CROSS_COMPILE is not to prefix executables
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
 export KBUILD_BUILDHOST := $(SUBARCH)
-ARCH		?= $(SUBARCH)
-CROSS_COMPILE	?= $(CONFIG_CROSS_COMPILE:"%"=%)
+#ARCH		?= $(SUBARCH)
+#CROSS_COMPILE	?= $(CONFIG_CROSS_COMPILE:"%"=%)
+ARCH		?= arm
+#CROSS_COMPILE	?=  /usr/local/arm/arm-2009q3/bin/arm-none-linux-gnueabi-
+CROSS_COMPILE	?= /usr/local/arm/arm-2012.03/bin/arm-none-linux-gnueabi-
+#CROSS_COMPILE	?= ../willow_jb_android/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-
+#CROSS_COMPILE	?= ../willow_android/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-
+#CROSS_COMPILE	?= ../willow_jb_android/prebuilts/gcc/linux-x86/arm/arm-eabi-4.6/bin/arm-eabi-
 
 # Architecture as present in compile.h
 UTS_MACHINE 	:= $(ARCH)
@@ -368,7 +376,8 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
-		   -fno-delete-null-pointer-checks
+		   -fno-delete-null-pointer-checks \
+		   -mtune=cortex-a9
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
 KBUILD_AFLAGS   := -D__ASSEMBLY__
@@ -562,6 +571,14 @@ ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS	+= -Os
 else
 KBUILD_CFLAGS	+= -O2
+endif
+
+ifdef CONFIG_CC_CHECK_WARNING_STRICTLY
+KBUILD_CFLAGS	+= -fdiagnostics-show-option -Werror \
+		   -Wno-error=unused-function \
+		   -Wno-error=unused-variable \
+		   -Wno-error=unused-value \
+		   -Wno-error=unused-label
 endif
 
 include $(srctree)/arch/$(SRCARCH)/Makefile

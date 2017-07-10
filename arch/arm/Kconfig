@@ -110,7 +110,6 @@ config STACKTRACE_SUPPORT
 
 config HAVE_LATENCYTOP_SUPPORT
 	bool
-	depends on !SMP
 	default y
 
 config LOCKDEP_SUPPORT
@@ -212,6 +211,9 @@ config ARM_PATCH_PHYS_VIRT_16BIT
 	  This option extends the physical to virtual translation patching
 	  to allow physical memory down to a theoretical minimum of 64K
 	  boundaries.
+
+config ARCH_HIBERNATION_POSSIBLE
+	def_bool y
 
 source "init/Kconfig"
 
@@ -1275,6 +1277,33 @@ config ARM_ERRATA_763722
 	depends on CPU_V7 && SMP
 	help
 	  This option enables the workaround for the 763722 Cortex-A15 erratum.
+
+config ARM_ERRATA_764369
+	bool "ARM errata: Data cache line maintenance operation by MVA may not succeed"
+	depends on CPU_V7 && SMP
+	help
+	  This option enables the workaround for erratum 764369
+	  affecting Cortex-A9 MPCore with two or more processors (all
+	  current revisions). Under certain timing circumstances, a data
+	  cache line maintenance operation by MVA targeting an Inner
+	  Shareable memory region may fail to proceed up to either the
+	  Point of Coherency or to the Point of Unification of the
+	  system. This workaround adds a DSB instruction before the
+	  relevant cache maintenance functions and sets a specific bit
+	  in the diagnostic control register of the SCU.
+
+config PL310_ERRATA_769419
+	bool "PL310 errata: no automatic Store Buffer drain"
+	depends on CACHE_L2X0
+	help
+	  On revisions of the PL310 prior to r3p2, the Store Buffer does
+	  not automatically drain. This can cause normal, non-cacheable
+	  writes to be retained when the memory system is idle, leading
+	  to suboptimal I/O performance for drivers using coherent DMA.
+	  This option adds a write barrier to the cpu_idle loop so that,
+	  on systems with an outer cache, the store buffer is drained
+	  explicitly.
+
 endmenu
 
 source "arch/arm/common/Kconfig"
@@ -1338,32 +1367,6 @@ config PCI_HOST_ITE8152
 source "drivers/pci/Kconfig"
 
 source "drivers/pcmcia/Kconfig"
-
-config ARM_ERRATA_764369
-	bool "ARM errata: Data cache line maintenance operation by MVA may not succeed"
-	depends on CPU_V7 && SMP
-	help
-	  This option enables the workaround for erratum 764369
-	  affecting Cortex-A9 MPCore with two or more processors (all
-	  current revisions). Under certain timing circumstances, a data
-	  cache line maintenance operation by MVA targeting an Inner
-	  Shareable memory region may fail to proceed up to either the
-	  Point of Coherency or to the Point of Unification of the
-	  system. This workaround adds a DSB instruction before the
-	  relevant cache maintenance functions and sets a specific bit
-	  in the diagnostic control register of the SCU.
-
-config PL310_ERRATA_769419
-	bool "PL310 errata: no automatic Store Buffer drain"
-	depends on CACHE_L2X0
-	help
-	  On revisions of the PL310 prior to r3p2, the Store Buffer does
-	  not automatically drain. This can cause normal, non-cacheable
-	  writes to be retained when the memory system is idle, leading
-	  to suboptimal I/O performance for drivers using coherent DMA.
-	  This option adds a write barrier to the cpu_idle loop so that,
-	  on systems with an outer cache, the store buffer is drained
-	  explicitly.
 
 endmenu
 
@@ -1476,7 +1479,8 @@ source kernel/Kconfig.preempt
 config HZ
 	int
 	default 200 if ARCH_EBSA110 || ARCH_S3C2410 || ARCH_S5P64X0 || \
-		ARCH_S5PV210 || ARCH_EXYNOS
+		ARCH_S5PV210 || (ARCH_EXYNOS && !MACH_FPGA5410)
+	default 20 if MACH_FPGA5410
 	default OMAP_32K_TIMER_HZ if ARCH_OMAP && OMAP_32K_TIMER
 	default AT91_TIMER_HZ if ARCH_AT91
 	default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE
@@ -1757,6 +1761,8 @@ config ARM_FLUSH_CONSOLE_ON_RESTART
 	  console drivers. This option forces the console lock to be
 	  released if it failed to be acquired, which will cause all the
 	  pending messages to be flushed.
+
+source "arch/arm/mvp/Kconfig"
 
 endmenu
 

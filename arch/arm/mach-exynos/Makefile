@@ -44,6 +44,7 @@ obj-$(CONFIG_EXYNOS_MCT)	+= mct.o
 obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
 
 obj-$(CONFIG_STAND_ALONE_POLICY)	+= stand-hotplug.o
+obj-$(CONFIG_LEGACY_HOTPLUG_POLICY)	+= pm-hotplug.o
 obj-$(CONFIG_WITH_DVFS_POLICY)		+= dvfs-hotplug.o
 obj-$(CONFIG_DVFS_NR_RUNNING_POLICY)	+= dynamic-dvfs-nr_running-hotplug.o
 obj-$(CONFIG_NR_RUNNING_POLICY)		+= dynamic-nr_running-hotplug.o
@@ -57,6 +58,7 @@ obj-$(CONFIG_MACH_UNIVERSAL_C210)	+= mach-universal_c210.o
 obj-$(CONFIG_MACH_NURI)			+= mach-nuri.o
 obj-$(CONFIG_MACH_SMDK4X12)		+= mach-smdk4x12.o
 obj-$(CONFIG_MACH_SMDK5250)		+= mach-smdk5250.o
+obj-$(CONFIG_MACH_WILLOW)		+= mach-willow.o willow-wlan.o willow-gpio.o
 
 # device support
 
@@ -110,10 +112,12 @@ obj-$(CONFIG_EXYNOS4_SETUP_TVOUT)	+= setup-tvout.o
 obj-$(CONFIG_EXYNOS4_SETUP_JPEG)	+= setup-jpeg.o
 obj-$(CONFIG_EXYNOS4_SETUP_MIPI_DSI)	+= setup-dsim.o
 obj-$(CONFIG_EXYNOS4_SETUP_MIPI_DSIM)	+= setup-mipidsim.o
-obj-$(CONFIG_EXYNOS4_CONTENT_PATH_PROTECTION) += secmem-allocdev.o
+obj-$(CONFIG_EXYNOS_CONTENT_PATH_PROTECTION) += secmem-allocdev.o
+obj-$(CONFIG_SEC_WATCHDOG_RESET)	+= sec_watchdog.o
 
 obj-$(CONFIG_WAKEUP_ASSIST)		+= wakeup_assist.o
 
 obj-$(CONFIG_ION_EXYNOS)		+= dev-ion.o
+obj-$(CONFIG_BT_BCM4334)		+= bluetooth-bcm4334.o
 obj-$(CONFIG_EXYNOS_C2C)		+= setup-c2c.o
 obj-$(CONFIG_EXYNOS_THERMAL)		+= tmu-exynos.o

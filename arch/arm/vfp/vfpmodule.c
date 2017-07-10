@@ -419,13 +419,15 @@ static int vfp_pm_suspend(void)
 		/* disable, just in case */
 		fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
 	} else if (vfp_current_hw_state[ti->cpu]) {
+#ifndef CONFIG_SMP
 		fmxr(FPEXC, fpexc | FPEXC_EN);
 		vfp_save_state(vfp_current_hw_state[ti->cpu], fpexc);
 		fmxr(FPEXC, fpexc);
+#endif
 	}
 
 	/* clear any information we had about last context state */
-	memset(vfp_current_hw_state, 0, sizeof(vfp_current_hw_state));
+	vfp_current_hw_state[ti->cpu] = NULL;
 
 	return 0;
 }
@@ -592,6 +594,7 @@ static int __init vfp_init(void)
 				elf_hwcap |= HWCAP_VFPv3D16;
 		}
 #endif
+#ifdef CONFIG_NEON
 		/*
 		 * Check for the presence of the Advanced SIMD
 		 * load/store instructions, integer and single
@@ -599,13 +602,10 @@ static int __init vfp_init(void)
 		 * for NEON if the hardware has the MVFR registers.
 		 */
 		if ((read_cpuid_id() & 0x000f0000) == 0x000f0000) {
-#ifdef CONFIG_NEON
 			if ((fmrx(MVFR1) & 0x000fff00) == 0x00011100)
 				elf_hwcap |= HWCAP_NEON;
-#endif
-			if ((fmrx(MVFR1) & 0xf0000000) == 0x10000000)
-				elf_hwcap |= HWCAP_VFPv4;
 		}
+#endif
 	}
 	return 0;
 }

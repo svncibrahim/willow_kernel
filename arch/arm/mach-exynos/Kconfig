@@ -59,7 +59,7 @@ config CPU_EXYNOS5250
 	help
 	  Enable EXYNOS5250 CPU support
 
-config EXYNOS4_CONTENT_PATH_PROTECTION
+config EXYNOS_CONTENT_PATH_PROTECTION
 	bool "Exynos4 Content Path Protection"
 	depends on ARM_TRUSTZONE
 	default n
@@ -134,6 +134,7 @@ config EXYNOS4_SETUP_DP
 
 config EXYNOS_DEV_PD
 	bool
+	select SAMSUNG_PD
 	help
 	  Compile in platform device definitions for Power Domain
 
@@ -212,8 +213,6 @@ config EXYNOS4_SETUP_SDHCI_GPIO
 
 config EXYNOS4_SETUP_MSHCI
 	bool
-	depends on S5P_DEV_MSHC
-	default y
 	select EXYNOS4_SETUP_MSHCI_GPIO
 	help
 	  Internal helper functions for EXYNOS4 based MSHCI systems.
@@ -390,6 +389,12 @@ config EXYNOS4X12_1200MHZ_SUPPORT
 	help
 	  Max 1.2Ghz support
 
+config EXYNOS4X12_1000MHZ_SUPPORT
+	bool "Max 1000MHz CPUFREQ LEVEL"
+	depends on EXYNOS4_CPUFREQ && (CPU_EXYNOS4412)
+	help
+	  Max 1.0Ghz support
+
 config EXYNOS5250_1400MHZ_SUPPORT
 	bool "Max 1400MHz CPUFREQ LEVEL"
 	depends on EXYNOS5_CPUFREQ && CPU_EXYNOS5250
@@ -426,6 +431,21 @@ choice
 
 config STAND_ALONE_POLICY
 	bool "Stand alone policy CPU hotplug"
+	depends on EXYNOS_PM_HOTPLUG
+	help
+	  PM hotplug policy. This is for exynos4210
+	  Enable to use pm hotplug, then it uses stand-hotplug.c file.
+	  Avg-load is calculated with both cpu frequency aspect
+	  and run queue status.
+
+config LEGACY_HOTPLUG_POLICY
+	bool "Legacy policy CPU hotplug"
+	depends on EXYNOS_PM_HOTPLUG
+	help
+	  PM hotplug policy. This is for exynos4210
+	  Enable to use pm hotplug, then it uses pm-hotplug.c file.
+	  Avg-load is calculated with only cpu utilization of cpu
+	  frequency at that time.
 
 config WITH_DVFS_POLICY
 	depends on EXYNOS4_CPUFREQ
@@ -448,11 +468,109 @@ config BUSFREQ
 	bool "Busfreq with PPC/PPMU"
 	depends on EXYNOS4_CPUFREQ
 
+config BUSFREQ_QOS
+	bool "QoS with Busfreq"
+	depends on BUSFREQ
+	default n
+
 config BUSFREQ_OPP
 	bool "Busfreq with OPP"
 	depends on EXYNOS4_CPUFREQ || EXYNOS5_CPUFREQ
 
+config DEVFREQ_BUS
+	bool "Busfreq support with Devfreq framework & Simple-Ondemand"
+	depends on EXYNOS4_CPUFREQ
+	select PM_DEVFREQ
+	select ARM_EXYNOS4_BUS_DEVFREQ
+
+choice
+	prompt "QoS LEVEL By Resolution"
+	depends on BUSFREQ_QOS || BUSFREQ_OPP
+	default BUSFREQ_QOS_LEVEL_NONE
+
+config BUSFREQ_QOS_NONE
+	bool "QoS Setting is not required"
+
+config BUSFREQ_QOS_1024X600
+	bool "QoS for 1024x600 (like P2)"
+
+config BUSFREQ_QOS_1280X720
+	bool "QoS for 1280x720 (like M0/T0)"
+
+config BUSFREQ_QOS_1280X800
+	bool "QoS for 1280x800 or 800x1280 (like Q1/P8)"
+
+endchoice
+
 endmenu
+
+config BUSFREQ_DEBUG
+	bool "BUSFREQ sysfs support"
+	default n
+
+config GPIO_MIDAS_01_BD
+	bool "GPIO configuration for Midas 01 BD"
+	depends on MACH_SLP_MIDAS
+
+config GPIO_MIDAS_02_BD
+	bool "GPIO configuration for Midas 02 BD"
+	depends on MACH_SLP_MIDAS
+
+config BUSFREQ_L2_160M
+	bool "Busfreq L2 level use 160MHz"
+	default n
+	help
+	Busfreq uses 160MHz for L2, not 133MHz. Optimize busfreq
+	dvfs level transition for LCD high resolution.
+	This enable 160MHz of L2 level. Q1 has high LCD resolution,
+	so uses busfreq dvfs L2 as 160MHz.
+
+config SEC_THERMISTOR
+	bool "Use external thermistor with ADC"
+	depends on SAMSUNG_DEV_ADC
+	default n
+	help
+	 Use thermistor driver for U1 & U1 Premium.
+	 U1 has two thermistors. this device driver use one of those
+	 to check system temperature.
+
+config EXYNOS_SYSREG_PM
+	bool "PM Support for System Registers"
+	depends on CPU_EXYNOS4210 || CPU_EXYNOS4412 || CPU_EXYNOS4212
+	default n
+	help
+	  Use System Register save/restore for suspend-to-RAM
+	  Some boards have this code hard coded in device drivers(FB);
+	  however, this is better supported at SoC support code.
+	  Currently, SLP kernel depends on this.
+
+config ANDROID_WIP
+	bool "work in progress hacks for android"
+	default n
+	help
+	  This enables 'work in progress' hacks for android issues.
+	  Please remove it later.
+
+config COMPACTION_RETRY
+	bool "retry compaction once more after direct reclaim fails"
+	default n
+	depends on COMPACTION
+	help
+	  This enables compaction retry in android.
+	  If fails to get pages even with direct reclaim,
+	  we give one more try to allocate pages with forced compaction.
+	  This might avoid oom-killer invocation.
+	  with many free pages being already there.
+
+config COMPACTION_RETRY_DEBUG
+	bool "debug information for COMPACTION_RETRY"
+	default n
+	depends on COMPACTION_RETRY
+	help
+	  This enables debug feature for compaction retry.
+	  This shows us the buddy information
+	  before and after compation retrial.
+	  This should be turned off later.
 
 # machine support
 
@@ -628,6 +746,53 @@ config MACH_SMDK4X12
 	select SAMSUNG_DEV_KEYPAD
 	help
 	  Machine support for Samsung SMDK4X12
+	  
+config MACH_WILLOW
+	bool "Willow board"
+	select CPU_EXYNOS4212
+	select CPU_EXYNOS4412
+	select S3C_DEV_WDT
+	select S3C_DEV_RTC
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C2
+	select S3C_DEV_I2C3
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select S3C_DEV_I2C6
+	select S5P_DEV_I2C_HDMIPHY
+	select S5P_GPIO_INT
+	select S5P_DEV_MFC
+	select S5P_DEV_FIMG2D
+	select S5P_DEV_FIMD0
+	select S5P_DEV_FIMD_S5P
+	select S5P_DEV_USB_EHCI
+	select S5P_DEV_USBGADGET
+	select S5P_DEV_USB_SWITCH
+	select S5P_SYSTEM_MMU
+	select EXYNOS_DEV_TMU
+	select EXYNOS_DEV_PD
+	select EXYNOS4_SETUP_SDHCI
+	select EXYNOS4_SETUP_MSHCI
+	select EXYNOS4_SETUP_FB_S5P
+	select EXYNOS4_SETUP_FIMD0
+	select EXYNOS4_SETUP_I2C1
+	select EXYNOS4_SETUP_I2C2
+	select EXYNOS4_SETUP_I2C3
+	select EXYNOS4_SETUP_I2C4
+	select EXYNOS4_SETUP_I2C5
+	select EXYNOS4_SETUP_I2C6
+	select EXYNOS4_SETUP_USB_PHY
+	select EXYNOS4_SETUP_KEYPAD
+	select EXYNOS4_SETUP_MFC
+	select EXYNOS4_DEV_FIMC_LITE
+	select SAMSUNG_DEV_ADC
+	select SAMSUNG_DEV_BACKLIGHT
+	select SAMSUNG_DEV_PWM
+	select SAMSUNG_DEV_KEYPAD
+	help
+	  Machine support for Thinkware Willow
 endmenu
 
 menu "EXYNOS5 Machines"
@@ -681,12 +846,27 @@ depends on PLAT_S5P
 comment "SELECT SYNOPSYS CONTROLLER INTERFACE DRIVER"
 config EXYNOS4_DEV_DWMCI
 	bool "DWMCI"
-	depends on PLAT_S5P
+	depends on PLAT_S5P && MMC_DW
 	default n
 	help
 	IF DWMCI is used, SDHC channel 0 is disabled.
 
-config S5P_DEV_MSHC
+config EXYNOS5_DEV_DWMCI1
+	bool
+	help
+	  Compile in platform device definitions for DWMCI channel 1
+
+config EXYNOS5_DEV_DWMCI2
+	bool
+	help
+	  Compile in platform device definitions for DWMCI channel 2
+
+config EXYNOS5_DEV_DWMCI3
+	bool
+	help
+	  Compile in platform device definitions for DWMCI channel 3
+
+config EXYNOS4_DEV_MSHC
 	bool "MSHCI"
 	depends on PLAT_S5P
 	default n
@@ -695,7 +875,7 @@ config S5P_DEV_MSHC
 
 choice
 	prompt "Use Special PLL for MSHC"
-	depends on PLAT_S5P && S5P_DEV_MSHC
+	depends on PLAT_S5P && EXYNOS4_DEV_MSHC
 	help
 		This feature change MMC4OUT's clock source between MPLL and EPLL
 	default EXYNOS4_MSHC_MPLL_40MHZ
@@ -710,18 +890,23 @@ config EXYNOS4_MSHC_EPLL_45MHZ
 	bool "EPLL"
 endchoice
 
+config EXYNOS4_MSHC_SUPPORT_PQPRIME_EPLL
+	bool "Support EPLL 45MHz for PegasusQ Prime dynamically"
+	depends on PLAT_S5P && EXYNOS4_DEV_MSHC && EXYNOS4_MSHC_MPLL_40MHZ
+	default n
+
 comment "Use 8-bit bus width"
 
 config EXYNOS4_MSHC_8BIT
-        bool "MSHC with 8-bit bus"
-	depends on PLAT_S5P && S5P_DEV_MSHC
+	bool "MSHC with 8-bit bus"
+	depends on PLAT_S5P && EXYNOS4_DEV_MSHC
 	default n
 	help
 	  IF MSHC uses 8-bit bus, SDHC channel 1 is disabled.
 
 config EXYNOS4_SDHCI_CH0_8BIT
 	bool "SDHC Channel 0 with 8-bit bus"
-	depends on PLAT_S5P && !EXYNOS4_DEV_DWMCI && !S5P_DEV_MSHC
+	depends on PLAT_S5P && !EXYNOS4_DEV_DWMCI && !EXYNOS4_DEV_MSHC
 	default n
 	help
 	  Support HSMMC Channel 0 8-bit bus.
@@ -734,9 +919,9 @@ config EXYNOS4_SDHCI_CH2_8BIT
 	  If selected, Channel 3 is disabled.
 
 comment "Use DDR"
-	depends on PLAT_S5P && S5P_DEV_MSHC
+	depends on PLAT_S5P && EXYNOS4_DEV_MSHC
 config EXYNOS4_MSHC_DDR
-        depends on PLAT_S5P && S5P_DEV_MSHC
+	depends on PLAT_S5P && EXYNOS4_DEV_MSHC
 	bool "MSHC with DDR mode"
 	default n
 	help
@@ -775,3 +960,23 @@ config EXYNOS5250_ABB_WA
 	default y
 	help
 	 Add W/A to fix ARM/INT ABB errata in EVT0
+
+menuconfig SEC_WATCHDOG_RESET
+	bool "S5PV310 watchdog reset to exit from lockup"
+	depends on (CPU_EXYNOS4210 || CPU_EXYNOS4212 || CPU_EXYNOS4412)
+	default n
+	help
+	  Use watchdog reset to exit from lockup
+
+if SEC_WATCHDOG_RESET
+config SEC_WATCHDOG_PET_TIME
+	int "sec watchdog kicking time interval value"
+	default 5
+endif
+
+config BT_BCM4334
+	bool "Enable BCM4334 driver"
+	default n
+	help
+	  Adds BCM4334 RFKILL driver for Broadcom BCM4334 chipset
+

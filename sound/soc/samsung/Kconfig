@@ -226,3 +226,20 @@ config SND_SOC_SPEYSIDE
 	select SND_SAMSUNG_I2S
 	select SND_SOC_WM8915
 	select SND_SOC_WM9081
+
+config SND_SOC_WILLOW_DAI
+	tristate "SoC I2S Audio support for WM8985, PCM Audio support for BCM4334 on WILLOW"
+	depends on SND_SOC_SAMSUNG && MACH_WILLOW
+	select SND_SOC_WM8985
+	select SND_SOC_BCM4334
+	select SND_SAMSUNG_I2S
+	select SND_SAMSUNG_PCM
+	select SND_SAMSUNG_PCM_USE_EPLL
+	help
+	  Say Y if you want to add support for SoC audio on the SMDKs
+
+config  JACK_MGR
+	tristate "Willow Earjack is supported"
+	depends on SND_SOC_WM8985
+	help
+	  Say Y here to use Willow earjack

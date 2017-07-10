@@ -92,7 +92,7 @@
 #ifdef CONFIG_EXYNOS4_DEV_DWMCI
 #include <mach/dwmci.h>
 #endif
-#ifdef CONFIG_EXYNOS4_CONTENT_PATH_PROTECTION
+#ifdef CONFIG_EXYNOS_CONTENT_PATH_PROTECTION
 #include <mach/secmem.h>
 #endif
 #include <mach/dev.h>
@@ -2266,7 +2266,7 @@ static struct regulator_init_data max77686_buck1_data = {
 	.constraints = {
 		.name = "vdd_mif range",
 		.min_uV = 800000,
-		.max_uV = 1050000,
+		.max_uV = 1300000,
 		.always_on = 1,
 		.boot_on = 1,
 		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
@@ -2280,7 +2280,7 @@ static struct regulator_init_data max77686_buck2_data = {
 	.constraints = {
 		.name = "vdd_arm range",
 		.min_uV = 800000,
-		.max_uV = 1350000,
+		.max_uV = 1400000,
 		.always_on = 1,
 		.boot_on = 1,
 		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
@@ -2293,7 +2293,7 @@ static struct regulator_init_data max77686_buck3_data = {
 	.constraints = {
 		.name = "vdd_int range",
 		.min_uV = 800000,
-		.max_uV = 1150000,
+		.max_uV = 1300000,
 		.always_on = 1,
 		.boot_on = 1,
 		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
@@ -3129,7 +3129,8 @@ struct tmu_data exynos_tmu_data __initdata = {
 		.start_throttle = 85,
 		.stop_warning  = 102,
 		.start_warning = 105,
-		.start_tripping = 110, /* temp to do tripping */
+		.start_tripping = 110,		/* temp to do tripping */
+		.start_hw_tripping = 113,	/* temp to do hw_trpping*/
 		.stop_mem_throttle = 80,
 		.start_mem_throttle = 85,
 
@@ -3518,7 +3519,7 @@ static void __init exynos4_reserve_mem(void)
 			.start = 0
 		},
 #endif
-#if !defined(CONFIG_EXYNOS4_CONTENT_PATH_PROTECTION) && \
+#if !defined(CONFIG_EXYNOS_CONTENT_PATH_PROTECTION) && \
 	defined(CONFIG_VIDEO_SAMSUNG_MEMSIZE_FIMC3)
 		{
 			.name = "fimc3",
@@ -3577,7 +3578,7 @@ static void __init exynos4_reserve_mem(void)
 		},
 #endif
 #endif
-#if !defined(CONFIG_EXYNOS4_CONTENT_PATH_PROTECTION) && \
+#if !defined(CONFIG_EXYNOS_CONTENT_PATH_PROTECTION) && \
 	defined(CONFIG_VIDEO_SAMSUNG_S5P_MFC)
 		{
 			.name		= "b2",
@@ -3608,7 +3609,7 @@ static void __init exynos4_reserve_mem(void)
 			.size = 0
 		},
 	};
-#ifdef CONFIG_EXYNOS4_CONTENT_PATH_PROTECTION
+#ifdef CONFIG_EXYNOS_CONTENT_PATH_PROTECTION
 	static struct cma_region regions_secure[] = {
 #ifdef CONFIG_VIDEO_SAMSUNG_MEMSIZE_FIMC3
 		{
@@ -3636,7 +3637,7 @@ static void __init exynos4_reserve_mem(void)
 			.size = 0
 		},
 	};
-#else /* !CONFIG_EXYNOS4_CONTENT_PATH_PROTECTION */
+#else /* !CONFIG_EXYNOS_CONTENT_PATH_PROTECTION */
 	struct cma_region *regions_secure = NULL;
 #endif
 	static const char map[] __initconst =
@@ -3644,7 +3645,7 @@ static void __init exynos4_reserve_mem(void)
 		"samsung-c2c=c2c_shdmem;"
 #endif
 		"s3cfb.0/fimd=fimd;exynos4-fb.0/fimd=fimd;"
-#ifdef CONFIG_EXYNOS4_CONTENT_PATH_PROTECTION
+#ifdef CONFIG_EXYNOS_CONTENT_PATH_PROTECTION
 		"s3cfb.0/video=video;exynos4-fb.0/video=video;"
 #endif
 		"s3c-fimc.0=fimc0;s3c-fimc.1=fimc1;s3c-fimc.2=fimc2;s3c-fimc.3=fimc3;"
@@ -3668,7 +3669,7 @@ static void __init exynos4_reserve_mem(void)
 		"s5p-mixer=tv;"
 		"s5p-fimg2d=fimg2d;"
 		"ion-exynos=ion,fimd,fimc0,fimc1,fimc2,fimc3,fw,b1,b2;"
-#ifdef CONFIG_EXYNOS4_CONTENT_PATH_PROTECTION
+#ifdef CONFIG_EXYNOS_CONTENT_PATH_PROTECTION
 		"s5p-smem/video=video;"
 		"s5p-smem/sectbl=sectbl;"
 #endif
@@ -4015,7 +4016,7 @@ static void __init smdk4x12_machine_init(void)
 	s3c_device_fimc1.dev.parent = &exynos4_device_pd[PD_CAM].dev;
 	s3c_device_fimc2.dev.parent = &exynos4_device_pd[PD_CAM].dev;
 	s3c_device_fimc3.dev.parent = &exynos4_device_pd[PD_CAM].dev;
-#ifdef CONFIG_EXYNOS4_CONTENT_PATH_PROTECTION
+#ifdef CONFIG_EXYNOS_CONTENT_PATH_PROTECTION
 	secmem.parent = &exynos4_device_pd[PD_CAM].dev;
 #endif
 #endif
@@ -4128,7 +4129,10 @@ static void __init smdk4x12_machine_init(void)
 #ifdef CONFIG_VIDEO_JPEG_V2X
 #ifdef CONFIG_EXYNOS_DEV_PD
 	s5p_device_jpeg.dev.parent = &exynos4_device_pd[PD_CAM].dev;
-	exynos4_jpeg_setup_clock(&s5p_device_jpeg.dev, 160000000);
+	if (samsung_rev() == EXYNOS4412_REV_2_0)
+		exynos4_jpeg_setup_clock(&s5p_device_jpeg.dev, 176000000);
+	else
+		exynos4_jpeg_setup_clock(&s5p_device_jpeg.dev, 160000000);
 #endif
 #endif
 
@@ -4140,7 +4144,10 @@ static void __init smdk4x12_machine_init(void)
 #ifdef CONFIG_EXYNOS_DEV_PD
 	s5p_device_mfc.dev.parent = &exynos4_device_pd[PD_MFC].dev;
 #endif
-	if (soc_is_exynos4412() && samsung_rev() >= EXYNOS4412_REV_1_0)
+	if (soc_is_exynos4412() && samsung_rev() >= EXYNOS4412_REV_2_0)
+		exynos4_mfc_setup_clock(&s5p_device_mfc.dev, 220 * MHZ);
+	else if ((soc_is_exynos4412() && samsung_rev() >= EXYNOS4412_REV_1_0) ||
+		(soc_is_exynos4212() && samsung_rev() >= EXYNOS4212_REV_1_0))
 		exynos4_mfc_setup_clock(&s5p_device_mfc.dev, 200 * MHZ);
 	else
 		exynos4_mfc_setup_clock(&s5p_device_mfc.dev, 267 * MHZ);
@@ -4171,8 +4178,12 @@ static void __init smdk4x12_machine_init(void)
 		platform_add_devices(smdk4412_devices, ARRAY_SIZE(smdk4412_devices));
 
 #ifdef CONFIG_FB_S3C
-	exynos4_fimd0_setup_clock(&s5p_device_fimd0.dev, "mout_mpll_user",
-				800 * MHZ);
+	if (samsung_rev() >= EXYNOS4412_REV_2_0)
+		exynos4_fimd0_setup_clock(&s5p_device_fimd0.dev,
+					"mout_mpll_user", 880 * MHZ);
+	else
+		exynos4_fimd0_setup_clock(&s5p_device_fimd0.dev,
+					"mout_mpll_user", 800 * MHZ);
 #endif
 #ifdef CONFIG_S3C64XX_DEV_SPI
 	sclk = clk_get(spi0_dev, "dout_spi0");
@@ -4185,7 +4196,7 @@ static void __init smdk4x12_machine_init(void)
 		printk(KERN_ERR "Unable to set parent %s of clock %s.\n",
 				prnt->name, sclk->name);
 
-	clk_set_rate(sclk, 800 * 1000 * 1000);
+	clk_set_rate(sclk, 100 * 1000 * 1000);
 	clk_put(sclk);
 	clk_put(prnt);
 
@@ -4210,7 +4221,7 @@ static void __init smdk4x12_machine_init(void)
 		printk(KERN_ERR "Unable to set parent %s of clock %s.\n",
 				prnt->name, sclk->name);
 
-	clk_set_rate(sclk, 800 * 1000 * 1000);
+	clk_set_rate(sclk, 100 * 1000 * 1000);
 	clk_put(sclk);
 	clk_put(prnt);
 
@@ -4235,7 +4246,7 @@ static void __init smdk4x12_machine_init(void)
 		printk(KERN_ERR "Unable to set parent %s of clock %s.\n",
 				prnt->name, sclk->name);
 
-	clk_set_rate(sclk, 800 * 1000 * 1000);
+	clk_set_rate(sclk, 100 * 1000 * 1000);
 	clk_put(sclk);
 	clk_put(prnt);
 
