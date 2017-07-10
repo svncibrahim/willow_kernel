@@ -43,7 +43,18 @@ struct gpio_keys_drvdata {
 	void (*disable)(struct device *dev);
 	struct gpio_button_data data[0];
 };
+#define FEATURE_TW_TOUCH_AUTO_CAL
 
+#if defined(FEATURE_TW_TOUCH_AUTO_CAL)
+int check_touch_cal=0;
+
+void set_touch_autoCal(int Setvalue)
+{
+	printk("set_touch_autoCal =%d \n", Setvalue);
+	check_touch_cal=Setvalue;
+}
+EXPORT_SYMBOL(set_touch_autoCal);
+#endif
 /*
  * SYSFS interface for enabling/disabling keys and switches:
  *
@@ -322,17 +333,26 @@ static void gpio_keys_report_event(struct gpio_button_data *bdata)
 	struct gpio_keys_button *button = bdata->button;
 	struct input_dev *input = bdata->input;
 	unsigned int type = button->type ?: EV_KEY;
-	struct irq_desc *desc = irq_to_desc(gpio_to_irq(button->gpio));
 	int state = (gpio_get_value_cansleep(button->gpio) ? 1 : 0) ^ button->active_low;
+	struct irq_desc *desc = irq_to_desc(gpio_to_irq(button->gpio));
 
-	if (type == EV_ABS) {
-		if (state)
-			input_event(input, type, button->code, button->value);
-	} else {
-		input_event(input, type, button->code,
-				irqd_is_wakeup_set(&desc->irq_data) ? 1 :!!state);
+#if defined(FEATURE_TW_TOUCH_AUTO_CAL)
+	if(check_touch_cal==1 &&  button->code==KEY_POWER)
+		printk("No Key Event Key Power \n");
+	else
+	{
+#endif
+		if (type == EV_ABS) {
+			if (state)
+				input_event(input, type, button->code, button->value);
+		} else {
+			input_event(input, type, button->code,
+					irqd_is_wakeup_set(&desc->irq_data) ? 1 :!!state);
+		}
+		input_sync(input);
+#if defined(FEATURE_TW_TOUCH_AUTO_CAL)
 	}
-	input_sync(input);
+#endif
 }
 
 static void gpio_keys_work_func(struct work_struct *work)
@@ -468,7 +488,9 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 		error = -ENOMEM;
 		goto fail1;
 	}
-
+#if defined(FEATURE_TW_TOUCH_AUTO_CAL)
+	check_touch_cal=0;
+#endif
 	ddata->input = input;
 	ddata->n_buttons = pdata->nbuttons;
 	ddata->enable = pdata->enable;

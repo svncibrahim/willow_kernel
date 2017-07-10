@@ -19,6 +19,7 @@ obj-$(CONFIG_PHANTOM)		+= phantom.o
 obj-$(CONFIG_SENSORS_BH1780)	+= bh1780gli.o
 obj-$(CONFIG_SENSORS_BH1770)	+= bh1770glc.o
 obj-$(CONFIG_SENSORS_APDS990X)	+= apds990x.o
+obj-$(CONFIG_ANDROID_PMEM)	+= pmem.o
 obj-$(CONFIG_SGI_IOC4)		+= ioc4.o
 obj-$(CONFIG_ENCLOSURE_SERVICES) += enclosure.o
 obj-$(CONFIG_KGDB_TESTS)	+= kgdbts.o
@@ -29,6 +30,7 @@ obj-$(CONFIG_HP_ILO)		+= hpilo.o
 obj-$(CONFIG_APDS9802ALS)	+= apds9802als.o
 obj-$(CONFIG_ISL29003)		+= isl29003.o
 obj-$(CONFIG_ISL29020)		+= isl29020.o
+obj-$(CONFIG_ISL29023)		+= isl29023.o
 obj-$(CONFIG_SENSORS_TSL2550)	+= tsl2550.o
 obj-$(CONFIG_EP93XX_PWM)	+= ep93xx_pwm.o
 obj-$(CONFIG_DS1682)		+= ds1682.o
@@ -51,3 +53,11 @@ obj-$(CONFIG_WL127X_RFKILL)	+= wl127x-rfkill.o
 obj-$(CONFIG_APANIC)		+= apanic.o
 obj-$(CONFIG_SENSORS_AK8975)	+= akm8975.o
 obj-$(CONFIG_SAMSUNG_C2C)	+= c2c/
+
+obj-$(CONFIG_VIBRATOR_ISA1200)		+= isa1200.o
+obj-$(CONFIG_HAPTIC_ISA1200)		+= isa1200_haptic.o
+obj-$(CONFIG_GPS_G6010)        += g6010.o
+obj-$(CONFIG_USBHUB_USB3503)	+= usb3503.o
+
+# Secure OS Mobicore Interface
+obj-$(CONFIG_MOBICORE_SUPPORT)  += tzic.o

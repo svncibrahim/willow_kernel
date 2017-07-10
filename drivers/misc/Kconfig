@@ -61,6 +61,22 @@ config AD525X_DPOT_SPI
 	  To compile this driver as a module, choose M here: the
 	  module will be called ad525x_dpot-spi.
 
+config ANDROID_PMEM
+	bool "Android pmem allocator"
+	default y
+
+if ANDROID_PMEM
+	comment "Reserved memory configurations"
+
+config ANDROID_PMEM_MEMSIZE_PMEM
+	int "Memory size in kbytes for android surface using pmem"
+	default "4"
+
+config ANDROID_PMEM_MEMSIZE_PMEM_GPU1
+	int "Memory size in kbytes for android surface using pmem_gpu1"
+	default "4000"
+endif
+
 config ATMEL_PWM
 	tristate "Atmel AT32/AT91 PWM support"
 	depends on AVR32 || ARCH_AT91SAM9263 || ARCH_AT91SAM9RL || ARCH_AT91CAP9
@@ -343,6 +359,16 @@ config ISL29020
 	  This driver can also be built as a module.  If so, the module
 	  will be called isl29020.
 
+config ISL29023
+	tristate "Intersil ISL29023 ambient light sensor"
+	depends on I2C
+	help
+	  If you say yes here you get support for the Intersil ISL29023
+	  ambient light sensor.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called isl29020.
+
 config SENSORS_TSL2550
 	tristate "Taos TSL2550 ambient light sensor"
 	depends on I2C && SYSFS
@@ -524,6 +550,28 @@ config APANIC_PLABEL
 	---help---
 	 If your platform uses a different flash partition label for storing
  	 crashdumps, enter it here.
+
+config VIBRATOR_ISA1200
+	boolean "isa1200 vibrator driver"
+	depends on I2C
+
+config HAPTIC_ISA1200
+	tristate "ISA1200 haptic support"
+	depends on I2C
+	default n
+	help
+	  The ISA1200 is a high performance enhanced haptic driver.
+
+config GPS_G6010
+        bool "G6010 GPS"
+        help
+	  g6010 gps driver
+
+config USBHUB_USB3503
+	bool "USB3503 USB HUB Driver"
+	depends on I2C
+	help
+	 Enables USB HUB USB3503
 
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"

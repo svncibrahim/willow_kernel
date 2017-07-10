@@ -56,6 +56,11 @@
 #include "atags.h"
 #include "tcm.h"
 
+#ifdef CONFIG_MACH_WILLOW
+#include <mach/willow_version.h>
+extern WILLOW_HW_VERSION willow_get_hw_version( void );
+#endif
+
 #ifndef MEM_SIZE
 #define MEM_SIZE	(16*1024*1024)
 #endif
@@ -75,6 +80,9 @@ __setup("fpe=", fpe_setup);
 extern void paging_init(struct machine_desc *desc);
 extern void sanity_check_meminfo(void);
 extern void reboot_setup(char *str);
+#ifdef CONFIG_DMA_CMA
+extern void setup_dma_zone(struct machine_desc *desc);
+#endif
 
 unsigned int processor_id;
 EXPORT_SYMBOL(processor_id);
@@ -887,6 +895,9 @@ void __init setup_arch(char **cmdline_p)
 	machine_desc = mdesc;
 	machine_name = mdesc->name;
 
+#ifdef CONFIG_DMA_CMA
+	setup_dma_zone(mdesc);
+#endif
 	if (mdesc->soft_reboot)
 		reboot_setup("s");
 
@@ -990,6 +1001,10 @@ static int c_show(struct seq_file *m, void *v)
 {
 	int i;
 
+#ifdef CONFIG_MACH_WILLOW
+	system_rev = willow_get_hw_version();
+#endif
+
 	seq_printf(m, "Processor\t: %s rev %d (%s)\n",
 		   cpu_name, read_cpuid_id() & 15, elf_platform);
 
@@ -1040,7 +1055,6 @@ static int c_show(struct seq_file *m, void *v)
 	seq_printf(m, "CPU revision\t: %d\n", read_cpuid_id() & 15);
 
 	seq_puts(m, "\n");
-
 	seq_printf(m, "Hardware\t: %s\n", machine_name);
 	seq_printf(m, "Revision\t: %04x\n", system_rev);
 	seq_printf(m, "Serial\t\t: %08x%08x\n",

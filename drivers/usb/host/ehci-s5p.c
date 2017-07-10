@@ -19,6 +19,7 @@
 #include <plat/cpu.h>
 #include <plat/ehci.h>
 #include <plat/usb-phy.h>
+#include <plat/devs.h>
 
 #include <mach/regs-pmu.h>
 #include <mach/regs-usb-host.h>
@@ -72,6 +73,23 @@ static int s5p_ehci_configurate(struct usb_hcd *hcd)
 			INSNREG00(hcd->regs));
 	return 0;
 }
+
+#ifdef CONFIG_USBHUB_USB3503
+int s5p_ehci_port_control(struct platform_device *pdev, int port, int enable)
+{
+	struct s5p_ehci_hcd *s5p_ehci = platform_get_drvdata(pdev);
+	struct usb_hcd *hcd = s5p_ehci->hcd;
+	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
+
+	(void) ehci_hub_control(hcd,
+			enable ? SetPortFeature : ClearPortFeature,
+			USB_PORT_FEAT_POWER,
+			port, NULL, 0);
+	/* Flush those writes */
+	ehci_readl(ehci, &ehci->regs->command);
+	return 0;
+}
+#endif
 
 #ifdef CONFIG_PM
 static int s5p_ehci_suspend(struct device *dev)
@@ -189,7 +207,8 @@ static int s5p_ehci_runtime_suspend(struct device *dev)
 		pdata->phy_suspend(pdev, S5P_USB_PHY_HOST);
 
 #ifdef CONFIG_USB_EXYNOS_SWITCH
-	if (samsung_board_rev_is_0_0()) {
+	if (1) //samsung_board_rev_is_0_0()) /* the same board configuration that Willow DVT has */
+	{
 		ehci_hub_control(hcd,
 			ClearPortFeature,
 			USB_PORT_FEAT_POWER,
@@ -241,7 +260,8 @@ static int s5p_ehci_runtime_resume(struct device *dev)
 		hcd->state = HC_STATE_SUSPENDED;
 #ifdef CONFIG_USB_EXYNOS_SWITCH
 	} else {
-		if (samsung_board_rev_is_0_0()) {
+		if (1) //samsung_board_rev_is_0_0()) /* the same board configuration that Willow DVT has */
+		{
 			ehci_hub_control(ehci_to_hcd(ehci),
 					SetPortFeature,
 					USB_PORT_FEAT_POWER,
@@ -301,11 +321,12 @@ static ssize_t show_ehci_power(struct device *dev,
 	return sprintf(buf, "EHCI Power %s\n", (s5p_ehci->power_on) ? "on" : "off");
 }
 
-static ssize_t store_ehci_power(struct device *dev,
-				struct device_attribute *attr,
-				const char *buf, size_t count)
+int ehci_power_control(struct device *dev, int force_enable,const char *buf)
 {
-	struct platform_device *pdev = to_platform_device(dev);
+	struct platform_device *pdev;
+	if(dev )	pdev = to_platform_device(dev);
+	else		pdev = &s5p_device_ehci;
+
 	struct s5p_ehci_platdata *pdata = pdev->dev.platform_data;
 	struct s5p_ehci_hcd *s5p_ehci = platform_get_drvdata(pdev);
 	struct usb_hcd *hcd = s5p_ehci->hcd;
@@ -313,12 +334,16 @@ static ssize_t store_ehci_power(struct device *dev,
 	int irq;
 	int retval;
 
-	if (sscanf(buf, "%d", &power_on) != 1)
-		return -EINVAL;
+	if(dev){
+		if (sscanf(buf, "%d", &power_on) != 1)
+			return -EINVAL;
 
-	device_lock(dev);
+		device_lock(dev);
+		pm_runtime_get_sync(dev);
+	}else{
+		power_on = force_enable;
+	}
 
-	pm_runtime_get_sync(dev);
 	if (!power_on && s5p_ehci->power_on) {
 		printk(KERN_DEBUG "%s: EHCI turns off\n", __func__);
 		s5p_ehci->power_on = 0;
@@ -347,8 +372,20 @@ static ssize_t store_ehci_power(struct device *dev,
 		s5p_ehci->power_on = 1;
 	}
 exit:
-	pm_runtime_put_sync(dev);
-	device_unlock(dev);
+	if(dev){
+		pm_runtime_put_sync(dev);
+		device_unlock(dev);
+	}
+	return 0;
+}
+EXPORT_SYMBOL(ehci_power_control);
+
+static ssize_t store_ehci_power(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	int retval = ehci_power_control(dev, -1, buf);
+	if(retval!=0) return retval;
 	return count;
 }
 static DEVICE_ATTR(ehci_power, 0664, show_ehci_power, store_ehci_power);
@@ -459,7 +496,7 @@ static int __devinit s5p_ehci_probe(struct platform_device *pdev)
 	s5p_ehci->power_on = 1;
 
 #ifdef CONFIG_USB_EXYNOS_SWITCH
-	if (samsung_board_rev_is_0_0())
+	if (1) //samsung_board_rev_is_0_0()) /* the same board configuration that Willow DVT has */
 		ehci_hub_control(ehci_to_hcd(ehci),
 				ClearPortFeature,
 				USB_PORT_FEAT_POWER,

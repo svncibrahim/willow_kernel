@@ -281,6 +281,22 @@ struct mmc_host {
 #ifdef CONFIG_MMC_DEBUG
 	unsigned int		removed:1;	/* host is being removed */
 #endif
+	unsigned int            state;          /* card slot state for SD */
+#define MMC_SD_STATE_PRESENT	(1<<0)		/* present state for SD */
+#define MMC_SD_INIT_STATUS	(1<<1)		/* present state for SD */
+#define MMC_SD_PREV_STATUS	(1<<2)		/* present state for SD */
+
+#define mmc_host_sd_present(h)		((h)->state & MMC_SD_STATE_PRESENT)
+#define mmc_host_sd_set_present(h)      ((h)->state |= MMC_SD_STATE_PRESENT)
+#define mmc_host_sd_clear_present(h)    ((h)->state &= ~MMC_SD_STATE_PRESENT)
+
+#define mmc_host_sd_init_stat(h)	((h)->state & MMC_SD_INIT_STATUS)
+#define mmc_host_sd_set_init_stat(h)	((h)->state |= MMC_SD_INIT_STATUS)
+#define mmc_host_sd_clear_init_stat(h)	((h)->state &= ~MMC_SD_INIT_STATUS)
+
+#define mmc_host_sd_prev_stat(h)	((h)->state & MMC_SD_PREV_STATUS)
+#define mmc_host_sd_set_prev_stat(h)	((h)->state |= MMC_SD_PREV_STATUS)
+#define mmc_host_sd_clear_prev_stat(h)	((h)->state &= ~MMC_SD_PREV_STATUS)
 
 	/* Only used with MMC_CAP_DISABLE */
 	int			enabled;	/* host is enabled */
@@ -308,6 +324,7 @@ struct mmc_host {
 
 	unsigned int		sdio_irqs;
 	struct task_struct	*sdio_irq_thread;
+	bool			sdio_irq_pending;
 	atomic_t		sdio_irq_thread_abort;
 
 	mmc_pm_flag_t		pm_flags;	/* requested pm features */
@@ -386,6 +403,7 @@ extern int mmc_cache_ctrl(struct mmc_host *, u8);
 static inline void mmc_signal_sdio_irq(struct mmc_host *host)
 {
 	host->ops->enable_sdio_irq(host, 0);
+	host->sdio_irq_pending = true;
 	wake_up_process(host->sdio_irq_thread);
 }
 

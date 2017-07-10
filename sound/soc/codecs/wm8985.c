@@ -28,8 +28,11 @@
 #include <sound/soc.h>
 #include <sound/initval.h>
 #include <sound/tlv.h>
+#include <mach/gpio.h>
 
 #include "wm8985.h"
+
+#define LINEOUT_CONTROL
 
 #define WM8985_NUM_SUPPLIES 4
 static const char *wm8985_supply_names[WM8985_NUM_SUPPLIES] = {
@@ -44,21 +47,21 @@ static const u16 wm8985_reg_defs[] = {
 	0x0000,     /* R1  - Power management 1 */
 	0x0000,     /* R2  - Power management 2 */
 	0x0000,     /* R3  - Power management 3 */
-	0x0050,     /* R4  - Audio Interface */
+	0x0002,     /* R4  - Audio Interface, Main Mic ADC data appears in right phase of LRC */
 	0x0000,     /* R5  - Companding control */
-	0x0140,     /* R6  - Clock Gen control */
-	0x0000,     /* R7  - Additional control */
+	0x0000,     /* R6  - Clock Gen control */
+	0x0180,     /* R7  - Additional control */
 	0x0000,     /* R8  - GPIO Control */
 	0x0000,     /* R9  - Jack Detect Control 1 */
-	0x0000,     /* R10 - DAC Control */
-	0x00FF,     /* R11 - Left DAC digital Vol */
-	0x00FF,     /* R12 - Right DAC digital vol */
+	0x0048,     /* R10 - DAC Control */
+	0x01FD,     /* R11 - Left DAC digital Vol */
+	0x01FD,     /* R12 - Right DAC digital vol */
 	0x0000,     /* R13 - Jack Detect Control 2 */
-	0x0100,     /* R14 - ADC Control */
-	0x00FF,     /* R15 - Left ADC Digital Vol */
-	0x00FF,     /* R16 - Right ADC Digital Vol */
+	0x01A0,     /* R14 - ADC Control */
+	0x01F5,     /* R15 - Left ADC Digital Vol */
+	0x01F5,     /* R16 - Right ADC Digital Vol */
 	0x0000,     /* R17 */
-	0x012C,     /* R18 - EQ1 - low shelf */
+	0x006C,     /* R18 - EQ1 - low shelf */
 	0x002C,     /* R19 - EQ2 - peak 1 */
 	0x002C,     /* R20 - EQ3 - peak 2 */
 	0x002C,     /* R21 - EQ4 - peak 3 */
@@ -85,23 +88,23 @@ static const u16 wm8985_reg_defs[] = {
 	0x0000,     /* R42 - OUT4 to ADC */
 	0x0000,     /* R43 - Beep control */
 	0x0033,     /* R44 - Input ctrl */
-	0x0010,     /* R45 - Left INP PGA gain ctrl */
-	0x0010,     /* R46 - Right INP PGA gain ctrl */
-	0x0100,     /* R47 - Left ADC BOOST ctrl */
-	0x0100,     /* R48 - Right ADC BOOST ctrl */
+	0x013F,     /* R45 - Left INP PGA gain ctrl */
+	0x0170,     /* R46 - Right INP PGA gain ctrl */
+	0x0000,     /* R47 - Left ADC BOOST ctrl */
+	0x0000,     /* R48 - Right ADC BOOST ctrl */
 	0x0002,     /* R49 - Output ctrl */
-	0x0001,     /* R50 - Left mixer ctrl */
-	0x0001,     /* R51 - Right mixer ctrl */
-	0x0039,     /* R52 - LOUT1 (HP) volume ctrl */
-	0x0039,     /* R53 - ROUT1 (HP) volume ctrl */
-	0x0039,     /* R54 - LOUT2 (SPK) volume ctrl */
-	0x0039,     /* R55 - ROUT2 (SPK) volume ctrl */
-	0x0001,     /* R56 - OUT3 mixer ctrl */
-	0x0001,     /* R57 - OUT4 (MONO) mix ctrl */
+	0x0008,     /* R50 - Left mixer ctrl */
+	0x0000,     /* R51 - Right mixer ctrl */
+	0x0174,     /* R52 - LOUT1 (HP) volume ctrl */
+	0x0174,     /* R53 - ROUT1 (HP) volume ctrl */
+	0x0131,     /* R54 - LOUT2 (SPK) volume ctrl */
+	0x0131,     /* R55 - ROUT2 (SPK) volume ctrl */
+	0x0041,     /* R56 - OUT3 mixer ctrl */
+	0x0041,     /* R57 - OUT4 (MONO) mix ctrl */
 	0x0001,     /* R58 */
 	0x0000,     /* R59 */
 	0x0004,     /* R60 - OUTPUT ctrl */
-	0x0000,     /* R61 - BIAS CTRL */
+	0x0100,     /* R61 - BIAS CTRL */
 	0x0180,     /* R62 */
 	0x0000      /* R63 */
 };
@@ -153,6 +156,11 @@ static const int bclk_divs[] = {
 static int eqmode_get(struct snd_kcontrol *kcontrol,
 		      struct snd_ctl_elem_value *ucontrol);
 static int eqmode_put(struct snd_kcontrol *kcontrol,
+		      struct snd_ctl_elem_value *ucontrol);
+
+static int amp_switch_get(struct snd_kcontrol *kcontrol,
+		      struct snd_ctl_elem_value *ucontrol);
+static int amp_switch_put(struct snd_kcontrol *kcontrol,
 		      struct snd_ctl_elem_value *ucontrol);
 
 static const DECLARE_TLV_DB_SCALE(dac_tlv, -12700, 50, 1);
@@ -239,6 +247,9 @@ static const char *depth_3d_text[] = {
 static const SOC_ENUM_SINGLE_DECL(depth_3d, WM8985_3D_CONTROL, 0,
 				  depth_3d_text);
 
+static const char *amp_switch_text[] = { "Off", "On" };
+static const SOC_ENUM_SINGLE_EXT_DECL(amp_switch, amp_switch_text);
+
 static const struct snd_kcontrol_new wm8985_snd_controls[] = {
 	SOC_SINGLE("Digital Loopback Switch", WM8985_COMPANDING_CONTROL,
 		0, 1, 0),
@@ -301,6 +312,11 @@ static const struct snd_kcontrol_new wm8985_snd_controls[] = {
 	SOC_DOUBLE_R("Speaker Switch", WM8985_LOUT2_SPK_VOLUME_CTRL,
 		WM8985_ROUT2_SPK_VOLUME_CTRL, 6, 1, 1),
 
+#ifdef LINEOUT_CONTROL
+	SOC_DOUBLE_R("Lineout Switch", WM8985_OUT3_MIXER_CTRL,
+		WM8985_OUT4_MONO_MIX_CTRL, 6, 1, 1),
+#endif
+
 	SOC_SINGLE("High Pass Filter Switch", WM8985_ADC_CONTROL, 8, 1, 0),
 	SOC_ENUM("High Pass Filter Mode", filter_mode),
 	SOC_SINGLE("High Pass Filter Cutoff", WM8985_ADC_CONTROL, 4, 7, 0),
@@ -330,19 +346,31 @@ static const struct snd_kcontrol_new wm8985_snd_controls[] = {
 
 	SOC_ENUM("3D Depth", depth_3d),
 
-	SOC_ENUM("Speaker Mode", speaker_mode)
+	SOC_ENUM("Speaker Mode", speaker_mode),
+
+	/* Main Mic Right, Headset Mic Left */
+	SOC_SINGLE("ADC LR Swap Switch", WM8985_AUDIO_INTERFACE, 1, 1, 0),
+
+	/* Amp Switch */
+	SOC_ENUM_EXT("AMP Switch", amp_switch, amp_switch_get, amp_switch_put)
 };
 
 static const struct snd_kcontrol_new left_out_mixer[] = {
 	SOC_DAPM_SINGLE("Line Switch", WM8985_LEFT_MIXER_CTRL, 1, 1, 0),
 	SOC_DAPM_SINGLE("Aux Switch", WM8985_LEFT_MIXER_CTRL, 5, 1, 0),
 	SOC_DAPM_SINGLE("PCM Switch", WM8985_LEFT_MIXER_CTRL, 0, 1, 0),
+#ifdef LINEOUT_CONTROL
+	SOC_DAPM_SINGLE("Lineout PCM Switch", WM8985_POWER_MANAGEMENT_1, 6, 1, 0),
+#endif
 };
 
 static const struct snd_kcontrol_new right_out_mixer[] = {
 	SOC_DAPM_SINGLE("Line Switch", WM8985_RIGHT_MIXER_CTRL, 1, 1, 0),
 	SOC_DAPM_SINGLE("Aux Switch", WM8985_RIGHT_MIXER_CTRL, 5, 1, 0),
 	SOC_DAPM_SINGLE("PCM Switch", WM8985_RIGHT_MIXER_CTRL, 0, 1, 0),
+#ifdef LINEOUT_CONTROL
+	SOC_DAPM_SINGLE("Lineout PCM Switch", WM8985_POWER_MANAGEMENT_1, 7, 1, 0),
+#endif
 };
 
 static const struct snd_kcontrol_new left_input_mixer[] = {
@@ -373,18 +401,18 @@ static const struct snd_kcontrol_new right_boost_mixer[] = {
 
 static const struct snd_soc_dapm_widget wm8985_dapm_widgets[] = {
 	SND_SOC_DAPM_DAC("Left DAC", "Left Playback", WM8985_POWER_MANAGEMENT_3,
-		0, 0),
-	SND_SOC_DAPM_DAC("Right DAC", "Right Playback", WM8985_POWER_MANAGEMENT_3,
 		1, 0),
+	SND_SOC_DAPM_DAC("Right DAC", "Right Playback", WM8985_POWER_MANAGEMENT_3,
+		0, 0),
 	SND_SOC_DAPM_ADC("Left ADC", "Left Capture", WM8985_POWER_MANAGEMENT_2,
 		0, 0),
 	SND_SOC_DAPM_ADC("Right ADC", "Right Capture", WM8985_POWER_MANAGEMENT_2,
 		1, 0),
 
 	SND_SOC_DAPM_MIXER("Left Output Mixer", WM8985_POWER_MANAGEMENT_3,
-		2, 0, left_out_mixer, ARRAY_SIZE(left_out_mixer)),
-	SND_SOC_DAPM_MIXER("Right Output Mixer", WM8985_POWER_MANAGEMENT_3,
 		3, 0, right_out_mixer, ARRAY_SIZE(right_out_mixer)),
+	SND_SOC_DAPM_MIXER("Right Output Mixer", WM8985_POWER_MANAGEMENT_3,
+		2, 0, left_out_mixer, ARRAY_SIZE(left_out_mixer)),
 
 	SND_SOC_DAPM_MIXER("Left Input Mixer", WM8985_POWER_MANAGEMENT_2,
 		2, 0, left_input_mixer, ARRAY_SIZE(left_input_mixer)),
@@ -402,16 +430,24 @@ static const struct snd_soc_dapm_widget wm8985_dapm_widgets[] = {
 		6, 1, NULL, 0),
 
 	SND_SOC_DAPM_PGA("Left Headphone Out", WM8985_POWER_MANAGEMENT_2,
-		7, 0, NULL, 0),
-	SND_SOC_DAPM_PGA("Right Headphone Out", WM8985_POWER_MANAGEMENT_2,
 		8, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("Right Headphone Out", WM8985_POWER_MANAGEMENT_2,
+		7, 0, NULL, 0),
 
 	SND_SOC_DAPM_PGA("Left Speaker Out", WM8985_POWER_MANAGEMENT_3,
-		5, 0, NULL, 0),
-	SND_SOC_DAPM_PGA("Right Speaker Out", WM8985_POWER_MANAGEMENT_3,
 		6, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("Right Speaker Out", WM8985_POWER_MANAGEMENT_3,
+		5, 0, NULL, 0),
 
-	SND_SOC_DAPM_MICBIAS("Mic Bias", WM8985_POWER_MANAGEMENT_1, 4, 0),
+#ifdef LINEOUT_CONTROL
+	SND_SOC_DAPM_PGA("Left Lineout Out", WM8985_POWER_MANAGEMENT_3,
+		7, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("Right Lineout Out", WM8985_POWER_MANAGEMENT_3,
+		8, 0, NULL, 0),
+#endif
+
+	/* we want mic to be turned on always */
+	//SND_SOC_DAPM_MICBIAS("Mic Bias", WM8985_POWER_MANAGEMENT_1, 4, 0),
 
 	SND_SOC_DAPM_INPUT("LIN"),
 	SND_SOC_DAPM_INPUT("LIP"),
@@ -424,17 +460,26 @@ static const struct snd_soc_dapm_widget wm8985_dapm_widgets[] = {
 	SND_SOC_DAPM_OUTPUT("HPL"),
 	SND_SOC_DAPM_OUTPUT("HPR"),
 	SND_SOC_DAPM_OUTPUT("SPKL"),
-	SND_SOC_DAPM_OUTPUT("SPKR")
+	SND_SOC_DAPM_OUTPUT("SPKR"),
+#ifdef LINEOUT_CONTROL
+	SND_SOC_DAPM_OUTPUT("LOL"),
+	SND_SOC_DAPM_OUTPUT("LOR")
+#endif
 };
 
 static const struct snd_soc_dapm_route audio_map[] = {
 	{ "Right Output Mixer", "PCM Switch", "Right DAC" },
 	{ "Right Output Mixer", "Aux Switch", "AUXR" },
 	{ "Right Output Mixer", "Line Switch", "Right Boost Mixer" },
-
+#ifdef LINEOUT_CONTROL
+	{ "Right Output Mixer", "Lineout PCM Switch", "Right DAC" },
+#endif
 	{ "Left Output Mixer", "PCM Switch", "Left DAC" },
 	{ "Left Output Mixer", "Aux Switch", "AUXL" },
 	{ "Left Output Mixer", "Line Switch", "Left Boost Mixer" },
+#ifdef LINEOUT_CONTROL
+	{ "Left Output Mixer", "Lineout PCM Switch", "Left DAC" },
+#endif
 
 	{ "Right Headphone Out", NULL, "Right Output Mixer" },
 	{ "HPR", NULL, "Right Headphone Out" },
@@ -447,6 +492,14 @@ static const struct snd_soc_dapm_route audio_map[] = {
 
 	{ "Left Speaker Out", NULL, "Left Output Mixer" },
 	{ "SPKL", NULL, "Left Speaker Out" },
+
+#ifdef LINEOUT_CONTROL
+	{ "Right Lineout Out", NULL, "Right Output Mixer" },
+	{ "LOR", NULL, "Right Lineout Out" },
+
+	{ "Left Lineout Out", NULL, "Left Output Mixer" },
+	{ "LOL", NULL, "Left Lineout Out" },
+#endif
 
 	{ "Right ADC", NULL, "Right Boost Mixer" },
 
@@ -530,6 +583,35 @@ static int eqmode_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int amp_switch_get(struct snd_kcontrol *kcontrol,
+		      struct snd_ctl_elem_value *ucontrol)
+{
+	int amp_onoff;
+
+	amp_onoff = gpio_get_value(GPIO_SPEAKER_AMP_ONOFF);
+	if (amp_onoff)
+		ucontrol->value.integer.value[0] = 1;
+	else
+		ucontrol->value.integer.value[0] = 0;
+
+	return 0;
+}
+
+static int amp_switch_put(struct snd_kcontrol *kcontrol,
+		      struct snd_ctl_elem_value *ucontrol)
+{
+	if (ucontrol->value.integer.value[0] == 0) {
+		gpio_set_value(GPIO_SPEAKER_AMP_ONOFF, 0);
+		gpio_set_value(GPIO_POP_SUPPRESSOR_ONOFF, 0);
+	} else if (ucontrol->value.integer.value[0] == 1) {
+		gpio_set_value(GPIO_SPEAKER_AMP_ONOFF, 1);
+		gpio_set_value(GPIO_POP_SUPPRESSOR_ONOFF, 1);
+		msleep(100);
+	} else {
+		return -EINVAL;
+	}
+}
+
 static int wm8985_add_widgets(struct snd_soc_codec *codec)
 {
 	struct snd_soc_dapm_context *dapm = &codec->dapm;
@@ -549,10 +631,21 @@ static int wm8985_reset(struct snd_soc_codec *codec)
 static int wm8985_dac_mute(struct snd_soc_dai *dai, int mute)
 {
 	struct snd_soc_codec *codec = dai->codec;
+	int ret;
 
-	return snd_soc_update_bits(codec, WM8985_DAC_CONTROL,
+	if (mute) { /* SOFTMUTE Disabled, AMP Off, POP Suppressor Off */
+		gpio_set_value(GPIO_SPEAKER_AMP_ONOFF, !mute);
+		gpio_set_value(GPIO_POP_SUPPRESSOR_ONOFF, !mute);
+	}
+	ret = snd_soc_update_bits(codec, WM8985_DAC_CONTROL,
 				   WM8985_SOFTMUTE_MASK,
 				   !!mute << WM8985_SOFTMUTE_SHIFT);
+	if (!mute) { /* SOFTMUTE Enabled, AMP On, POP Suppressor On */
+		gpio_set_value(GPIO_SPEAKER_AMP_ONOFF, !mute);
+		gpio_set_value(GPIO_POP_SUPPRESSOR_ONOFF, !mute);
+		msleep(100);
+	}
+	return ret;
 }
 
 static int wm8985_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
@@ -680,6 +773,26 @@ static int wm8985_hw_params(struct snd_pcm_substream *substream,
 	snd_soc_update_bits(codec, WM8985_AUDIO_INTERFACE,
 			    WM8985_WL_MASK, blen << WM8985_WL_SHIFT);
 
+#if 1//enable upper 10khz sound
+	/* disable the PLL before reprogramming it */
+	snd_soc_update_bits(codec, WM8985_POWER_MANAGEMENT_1,
+			    WM8985_PLLEN_MASK, 0);
+
+	/* set PLLN and PRESCALE */
+	snd_soc_write(codec,WM8985_PLL_N,0x007);
+
+	/* set PLLK */
+	snd_soc_write(codec,WM8985_PLL_K_1,0x016);
+	snd_soc_write(codec,WM8985_PLL_K_2,0x0CC);
+	snd_soc_write(codec,WM8985_PLL_K_3,0x19A);
+
+	/* set the source of the clock to be the PLL */
+	snd_soc_write(codec,WM8985_CLOCK_GEN_CONTROL,0);
+
+	/* enable the PLL */
+	snd_soc_update_bits(codec, WM8985_POWER_MANAGEMENT_1,
+			    WM8985_PLLEN_MASK, WM8985_PLLEN);
+#else
 	/*
 	 * match to the nearest possible sample rate and rely
 	 * on the array index to configure the SR register
@@ -731,6 +844,7 @@ static int wm8985_hw_params(struct snd_pcm_substream *substream,
 	dev_dbg(dai->dev, "BCLK div = %d\n", i);
 	snd_soc_update_bits(codec, WM8985_CLOCK_GEN_CONTROL,
 			    WM8985_BCLKDIV_MASK, i << WM8985_BCLKDIV_SHIFT);
+#endif
 	return 0;
 }
 
@@ -783,6 +897,8 @@ static int wm8985_set_pll(struct snd_soc_dai *dai, int pll_id,
 	int ret;
 	struct snd_soc_codec *codec;
 	struct pll_div pll_div;
+
+	memset(&pll_div, 0, sizeof(pll_div));
 
 	codec = dai->codec;
 	if (freq_in && freq_out) {
@@ -904,6 +1020,10 @@ static int wm8985_set_bias_level(struct snd_soc_codec *codec,
 			/* enable BIASEN */
 			snd_soc_update_bits(codec, WM8985_POWER_MANAGEMENT_1,
 					    WM8985_BIASEN_MASK, WM8985_BIASEN);
+			/* enable MICBEN */
+			snd_soc_update_bits(codec, WM8985_POWER_MANAGEMENT_1,
+					    WM8985_MICBEN_MASK,
+					    1 << WM8985_MICBEN_SHIFT);
 			/* VMID at 75k */
 			snd_soc_update_bits(codec, WM8985_POWER_MANAGEMENT_1,
 					    WM8985_VMIDSEL_MASK,
@@ -967,6 +1087,8 @@ static int wm8985_remove(struct snd_soc_codec *codec)
 	wm8985 = snd_soc_codec_get_drvdata(codec);
 	wm8985_set_bias_level(codec, SND_SOC_BIAS_OFF);
 	regulator_bulk_free(ARRAY_SIZE(wm8985->supplies), wm8985->supplies);
+	gpio_free(GPIO_SPEAKER_AMP_ONOFF);
+	gpio_free(GPIO_POP_SUPPRESSOR_ONOFF);
 	return 0;
 }
 
@@ -1008,6 +1130,20 @@ static int wm8985_probe(struct snd_soc_codec *codec)
 		goto err_reg_enable;
 	}
 
+	ret = gpio_request(GPIO_SPEAKER_AMP_ONOFF, "SPEAKER_AMP_ONOFF");
+	if (ret) {
+		dev_err(codec->dev,"[%s] SPEAKER_AMP_ONOFF gpio request error : %d\n",__func__,ret);
+		goto exit_spk_amp_onoff_gpio_request_failed;
+	}
+	gpio_direction_output(GPIO_SPEAKER_AMP_ONOFF, 0);
+
+	ret = gpio_request(GPIO_POP_SUPPRESSOR_ONOFF, "POP_SUPPRESSOR_ONOFF");
+	if (ret) {
+		dev_err(codec->dev,"[%s] POP_SUPPRESSOR_ONOFF gpio request error : %d\n",__func__,ret);
+		goto exit_pop_suppressor_onoff_gpio_request_failed;
+	}
+	gpio_direction_output(GPIO_POP_SUPPRESSOR_ONOFF, 0);
+
 	cache = codec->reg_cache;
 	/* latch volume update bits */
 	for (i = 0; i < ARRAY_SIZE(volume_update_regs); ++i)
@@ -1023,6 +1159,10 @@ static int wm8985_probe(struct snd_soc_codec *codec)
 	wm8985_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
 	return 0;
 
+exit_pop_suppressor_onoff_gpio_request_failed:
+	gpio_free(GPIO_POP_SUPPRESSOR_ONOFF);
+exit_spk_amp_onoff_gpio_request_failed:
+	gpio_free(GPIO_SPEAKER_AMP_ONOFF);
 err_reg_enable:
 	regulator_bulk_disable(ARRAY_SIZE(wm8985->supplies), wm8985->supplies);
 err_reg_get:
@@ -1052,7 +1192,7 @@ static struct snd_soc_dai_driver wm8985_dai = {
 	},
 	.capture = {
 		.stream_name = "Capture",
-		.channels_min = 2,
+		.channels_min = 1,
 		.channels_max = 2,
 		.rates = SNDRV_PCM_RATE_8000_48000,
 		.formats = WM8985_FORMATS,
@@ -1138,7 +1278,7 @@ static __devexit int wm8985_i2c_remove(struct i2c_client *client)
 }
 
 static const struct i2c_device_id wm8985_i2c_id[] = {
-	{ "wm8985", 0 },
+	{ "wm8985", 1 },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, wm8985_i2c_id);

@@ -49,15 +49,27 @@ static u8 test_pkt[TEST_PKT_SIZE] __attribute__((aligned(8))) = {
 
 static void s3c_udc_ep_set_stall(struct s3c_ep *ep);
 
-#if defined(CONFIG_BATTERY_SAMSUNG)
+#if defined(CONFIG_BATTERY_MAX17040)
+extern void isUSBconnected(bool usb_connect);
+#endif
+
+#if defined(CONFIG_BATTERY_SAMSUNG) || defined(CONFIG_BATTERY_MAX17040)
 void s3c_udc_cable_connect(struct s3c_udc *dev)
 {
+#if defined(CONFIG_BATTERY_MAX17040)
+	isUSBconnected(1);
+#else
 	samsung_cable_check_status(1);
+#endif
 }
 
 void s3c_udc_cable_disconnect(struct s3c_udc *dev)
 {
+#if defined(CONFIG_BATTERY_MAX17040)
+	isUSBconnected(0);
+#else
 	samsung_cable_check_status(0);
+#endif
 }
 #endif
 
@@ -76,7 +88,7 @@ static inline void s3c_udc_ep0_zlp(struct s3c_udc *dev)
 		__func__, __raw_readl(dev->regs + S3C_UDC_OTG_DIEPCTL(EP0_CON)));
 }
 
-static inline void s3c_udc_pre_setup(struct s3c_udc *dev)
+static inline void s3c_udc_pre_setup(struct s3c_udc *dev, bool need_nak)
 {
 	u32 ep_ctrl;
 
@@ -87,8 +99,11 @@ static inline void s3c_udc_pre_setup(struct s3c_udc *dev)
 	__raw_writel(dev->usb_ctrl_dma, dev->regs + S3C_UDC_OTG_DOEPDMA(EP0_CON));
 
 	ep_ctrl = __raw_readl(dev->regs + S3C_UDC_OTG_DOEPCTL(EP0_CON));
-	__raw_writel(ep_ctrl|DEPCTL_EPENA|DEPCTL_CNAK,
-		dev->regs + S3C_UDC_OTG_DOEPCTL(EP0_CON));
+	if (need_nak)
+		ep_ctrl |= (DEPCTL_EPENA | DEPCTL_SNAK);
+	else
+		ep_ctrl |= (DEPCTL_EPENA | DEPCTL_CNAK);
+	__raw_writel(ep_ctrl, dev->regs + S3C_UDC_OTG_DOEPCTL(EP0_CON));
 }
 
 static int setdma_rx(struct s3c_ep *ep, struct s3c_request *req)
@@ -243,7 +258,7 @@ static void complete_rx(struct s3c_udc *dev, u8 ep_num)
 	}
 }
 
-static void complete_tx(struct s3c_udc *dev, u8 ep_num)
+static void complete_tx(struct s3c_udc *dev, u8 ep_num, bool *is_status)
 {
 	struct s3c_ep *ep = &dev->ep[ep_num];
 	struct s3c_request *req;
@@ -286,6 +301,10 @@ static void complete_tx(struct s3c_udc *dev, u8 ep_num)
 		     "is_short = %d, DIEPTSIZ = 0x%x, remained bytes = %d\n",
 			__func__, ep_num, req->req.actual, req->req.length,
 			is_short, ep_tsr, xfer_size);
+
+	/* IN zlp is status transaction */
+	if (!req->req.length)
+		*is_status = true;
 
 	if (req->req.actual == req->req.length) {
 		/* send ZLP when req.zero is set and the last packet is maxpacket */
@@ -334,6 +353,7 @@ static void process_ep_in_intr(struct s3c_udc *dev)
 {
 	u32 ep_intr, ep_intr_status;
 	u8 ep_num = 0;
+	bool is_status = false;
 
 	ep_intr = __raw_readl(dev->regs + S3C_UDC_OTG_DAINT);
 	DEBUG_IN_EP("*** %s: EP In interrupt : DAINT = 0x%x\n",
@@ -351,12 +371,18 @@ static void process_ep_in_intr(struct s3c_udc *dev)
 			__raw_writel(ep_intr_status, dev->regs + S3C_UDC_OTG_DIEPINT(ep_num));
 
 			if (ep_intr_status & TRANSFER_DONE) {
-				complete_tx(dev, ep_num);
+				complete_tx(dev, ep_num, &is_status);
 
 				if (ep_num == 0) {
+					/*
+					 * Set NAK ep0 OUT after IN status
+					 * transaction. In other cases,
+					 * clear NAK to receive OUT status
+					 * transaction.
+					 */
 					if (dev->ep0state == WAIT_FOR_SETUP)
-						s3c_udc_pre_setup(dev);
-
+						s3c_udc_pre_setup(dev,
+								is_status);
 					/* continue transfer after
 						set_clear_halt for DMA mode */
 					if (clear_feature_flag == 1) {
@@ -376,7 +402,6 @@ static void process_ep_out_intr(struct s3c_udc *dev)
 {
 	u32 ep_intr, ep_intr_status;
 	u8 ep_num = 0;
-	u32 ep_ctrl = 0;
 	ep_intr = __raw_readl(dev->regs + S3C_UDC_OTG_DAINT);
 	DEBUG_OUT_EP("*** %s: EP OUT interrupt : DAINT = 0x%x\n",
 				__func__, ep_intr);
@@ -403,14 +428,7 @@ static void process_ep_out_intr(struct s3c_udc *dev)
 
 				if (ep_intr_status & TRANSFER_DONE) {
 					complete_rx(dev, ep_num);
-					__raw_writel((3<<29)|(1 << 19)|sizeof(struct usb_ctrlrequest),
-						dev->regs + S3C_UDC_OTG_DOEPTSIZ(EP0_CON));
-					__raw_writel(dev->usb_ctrl_dma,
-						dev->regs + S3C_UDC_OTG_DOEPDMA(EP0_CON));
-
-					ep_ctrl = readl(dev->regs + S3C_UDC_OTG_DOEPCTL(EP0_CON));
-					__raw_writel(ep_ctrl|DEPCTL_EPENA|DEPCTL_SNAK,
-						dev->regs + S3C_UDC_OTG_DOEPCTL(EP0_CON));
+					s3c_udc_pre_setup(dev, true);
 				}
 
 			} else {
@@ -509,7 +527,7 @@ static irqreturn_t s3c_udc_irq(int irq, void *_dev)
 				reset_usbd();
 				dev->ep0state = WAIT_FOR_SETUP;
 				reset_available = 0;
-				s3c_udc_pre_setup(dev);
+				s3c_udc_pre_setup(dev, true);
 			} else
 				reset_available = 1;
 		} else {
@@ -522,7 +540,7 @@ static irqreturn_t s3c_udc_irq(int irq, void *_dev)
 				spin_lock(&dev->lock);
 			}
 
-#if defined(CONFIG_BATTERY_SAMSUNG)
+#if defined(CONFIG_BATTERY_SAMSUNG) || defined(CONFIG_BATTERY_MAX17040)
 			s3c_udc_cable_disconnect(dev);
 #endif
 		}
@@ -713,7 +731,7 @@ static inline void s3c_udc_ep0_set_stall(struct s3c_ep *ep)
 	 */
 	dev->ep0state = WAIT_FOR_SETUP;
 
-	s3c_udc_pre_setup(dev);
+	s3c_udc_pre_setup(dev, true);
 }
 
 static void s3c_ep0_read(struct s3c_udc *dev)
@@ -1301,7 +1319,7 @@ static void s3c_ep0_setup(struct s3c_udc *dev)
 			reset_available = 1;
 			dev->req_config = 1;
 		}
-#if defined(CONFIG_BATTERY_SAMSUNG)
+#if defined(CONFIG_BATTERY_SAMSUNG) || defined(CONFIG_BATTERY_MAX17040)
 		s3c_udc_cable_connect(dev);
 #endif
 		break;

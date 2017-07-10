@@ -7,6 +7,9 @@ config FB_S5P
 	select FB_CFB_FILLRECT
 	select FB_CFB_COPYAREA
 	select FB_CFB_IMAGEBLIT
+	select SYNC
+	select SW_SYNC
+	select SW_SYNC_USER
 	depends on FB && (ARCH_S5PV210 || ARCH_EXYNOS4) && !FB_S3C
 	default n
 	help
@@ -24,6 +27,10 @@ config FB_S5P_LCD_INIT
 
 config FB_S5P_DEBUG
 	bool "S5P Framebuffer debug messages"
+	depends on FB_S5P
+
+config FB_S5P_VSYNC_THREAD
+	bool "S5P Framebuffer vsync thread"
 	depends on FB_S5P
 
 config FB_S5P_TRACE_UNDERRUN
@@ -74,7 +81,7 @@ config VIDEO_SAMSUNG_MEMSIZE_FIMD
 
 config VIDEO_SAMSUNG_MEMSIZE_FIMD_VIDEO
 	int "Memory size in kbytes for FIMD Video Layer"
-	depends on FB_S5P && EXYNOS4_CONTENT_PATH_PROTECTION
+	depends on FB_S5P && EXYNOS_CONTENT_PATH_PROTECTION
 	default "16384"
 
 config FB_S5P_MIPI_DSIM
@@ -87,7 +94,7 @@ config FB_S5P_MIPI_DSIM
 choice
 depends on FB_S5P
 prompt "Select LCD Type"
-default FB_S5P_AMS369FG06
+default FB_S5P_LTN101AL03
 config FB_S5P_LTE480WV
 	bool "LTE480WV"
 	depends on MACH_SMDKV310 || MACH_SMDKC210 || MACH_SMDKV210 || MACH_SMDKC110
@@ -114,6 +121,12 @@ config FB_S5P_AMS369FG06
 	select SPI_GPIO
 	help
 	  This enables support for Samsung AMS369FG06 3.7" WVGA AMOLED panel
+
+config FB_S5P_LTN101AL03
+	bool "LTN101AL03"
+	depends on MACH_WILLOW
+	help
+	  This enables support for 10.1" 1280*800 Samsung LCD panel
 
 config FB_S5P_LMS501KF03
 	bool "LMS501KF03"

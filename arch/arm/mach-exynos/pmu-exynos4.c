@@ -15,6 +15,7 @@
 
 #include <mach/regs-clock.h>
 #include <mach/pmu.h>
+#include <mach/regs-pmu.h>
 
 #include <plat/cpu.h>
 
@@ -321,11 +322,44 @@ static struct exynos4_pmu_conf exynos4212_c2c_pmu_conf[] = {
 
 static struct exynos4_c2c_pmu_conf exynos4_config_for_c2c[] = {
 	/* Register Address	       Value */
-	{ S5P_TOP_BUS_COREBLK_SYS,	0x0},
-	{ S5P_TOP_PWR_COREBLK_SYS,	0x0},
-	{ S5P_MPLL_SYSCLK_SYS,		0x0},
-	{ S5P_XUSBXTI_SYS,		0x0},
+	{ S5P_TOP_BUS_COREBLK_SYS,      0x0},
+	{ S5P_TOP_PWR_COREBLK_SYS,      0x0},
+	{ S5P_MPLL_SYSCLK_SYS,          0x0},
+	{ S5P_XUSBXTI_SYS,              0x0},
 };
+
+void exynos4_pmu_xclkout_set(unsigned int enable, enum xclkout_select source)
+{
+	unsigned int tmp;
+
+	if (enable) {
+		tmp = __raw_readl(S5P_PMU_DEBUG);
+		/* CLKOUT enable */
+		tmp &= ~(0xF << S5P_PMU_CLKOUT_SEL_SHIFT | S5P_CLKOUT_DISABLE);
+		tmp |= (source << S5P_PMU_CLKOUT_SEL_SHIFT);
+		__raw_writel(tmp, S5P_PMU_DEBUG);
+	} else {
+		tmp = __raw_readl(S5P_PMU_DEBUG);
+		tmp |= S5P_CLKOUT_DISABLE; /* CLKOUT disable */
+		__raw_writel(tmp, S5P_PMU_DEBUG);
+	}
+	printk(KERN_DEBUG "pmu_debug: 0x%08x\n", __raw_readl(S5P_PMU_DEBUG));
+}
+EXPORT_SYMBOL_GPL(exynos4_pmu_xclkout_set);
+
+void exynos4_sys_powerdown_xusbxti_control(unsigned int enable)
+{
+	unsigned int count = entry_cnt;
+
+	if (enable)
+		exynos4_pmu_config[count - 1].val[SYS_SLEEP] = 0x1;
+	else
+		exynos4_pmu_config[count - 1].val[SYS_SLEEP] = 0x0;
+
+	printk(KERN_DEBUG "xusbxti_control: %ld\n",
+			exynos4_pmu_config[count - 1].val[SYS_SLEEP]);
+}
+EXPORT_SYMBOL_GPL(exynos4_sys_powerdown_xusbxti_control);
 
 void exynos4_sys_powerdown_conf(enum sys_powerdown mode)
 {
@@ -378,7 +412,8 @@ void exynos4_c2c_request_pwr_mode(enum c2c_pwr_mode mode)
 
 static int __init exynos4_pmu_init(void)
 {
-	exynos4_reset_assert_ctrl(1);
+	if(!soc_is_exynos4210())
+		exynos4_reset_assert_ctrl(1);
 
 	if (soc_is_exynos4210()) {
 		exynos4_pmu_config = exynos4210_pmu_config;

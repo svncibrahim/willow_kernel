@@ -39,12 +39,6 @@
 #include <asm/stacktrace.h>
 #include <asm/mach/time.h>
 
-#ifdef CONFIG_ARCH_EXYNOS4
-#include <asm/hardware/gic.h>
-#include <plat/map-base.h>
-#include <plat/map-s5p.h>
-#endif
-
 #ifdef CONFIG_CC_STACKPROTECTOR
 #include <linux/stackprotector.h>
 unsigned long __stack_chk_guard __read_mostly;
@@ -241,11 +235,6 @@ void cpu_idle(void)
 #ifdef CONFIG_PL310_ERRATA_769419
 			wmb();
 #endif
-#ifdef CONFIG_ARCH_EXYNOS4
-			__raw_writel(__raw_readl(S5P_VA_GIC_DIST + GIC_DIST_PRI),
-					S5P_VA_GIC_DIST + GIC_DIST_PRI);
-#endif
-
 			if (hlt_counter) {
 				local_irq_enable();
 				cpu_relax();
@@ -283,6 +272,15 @@ __setup("reboot=", reboot_setup);
 void machine_shutdown(void)
 {
 #ifdef CONFIG_SMP
+	/*
+	 * Disable preemption so we're guaranteed to
+	 * run to power off or reboot and prevent
+	 * the possibility of switching to another
+	 * thread that might wind up blocking on
+	 * one of the stopped CPUs.
+	 */
+	preempt_disable();
+
 	smp_send_stop();
 #endif
 }

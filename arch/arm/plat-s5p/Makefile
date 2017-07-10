@@ -25,6 +25,7 @@ obj-$(CONFIG_S5P_SYSTEM_MMU)	+= sysmmu.o
 obj-$(CONFIG_PM)		+= pm.o
 obj-$(CONFIG_PM)		+= irq-pm.o
 obj-$(CONFIG_S5P_HRT) 		+= s5p-time.o
+obj-$(CONFIG_S5P_BTS)		+= bts.o
 
 # devices
 
@@ -51,9 +52,13 @@ obj-$(CONFIG_S5P_DEV_JPEG)	+= dev-jpeg.o
 obj-$(CONFIG_S5P_DEV_USB_EHCI)	+= dev-ehci.o
 obj-$(CONFIG_S5P_DEV_USBGADGET)	+= dev-usbgadget.o
 obj-$(CONFIG_S5P_DEV_MIPI_DSI)	+= dev-dsim.o
+obj-$(CONFIG_S5P_DEV_DSIM02)	+= dev-dsim02.o
+obj-$(CONFIG_S5P_DEV_DSIM12)	+= dev-dsim12.o
 obj-$(CONFIG_S5P_DEV_MIPI_DSIM)	+= dev-mipidsim.o
 obj-$(CONFIG_S5P_SETUP_MIPIPHY)	+= setup-mipiphy.o
-obj-$(CONFIG_S5P_DEV_ACE) 	+= dev-ace.o
+obj-$(CONFIG_EXYNOS4_SETUP_THERMAL)	+= dev-tmu.o
+obj-$(CONFIG_S5P_DEV_ACE)	+= dev-ace.o
 obj-$(CONFIG_IOMMU_API)		+= s5p_iommu.o
 obj-$(CONFIG_ION)		+= s5p_iovmm.o
 obj-$(CONFIG_S5P_DEV_I2C_HDMIPHY)	+= dev-i2c-hdmiphy.o
+obj-$(CONFIG_S3C_DEV_TSI)	+= dev-tsi.o

@@ -21,6 +21,15 @@
 #include <linux/pwm_backlight.h>
 #include <linux/slab.h>
 
+#undef FEATURE_PWM_DEBUG
+#define FEATURE_WILLOW_BACKLIGHT
+
+#ifdef FEATURE_PWM_DEBUG
+#define pwm_log(fmt, arg...) 	printk(fmt, ##arg)
+#else
+#define pwm_log(fmt, arg...)
+#endif
+
 struct pwm_bl_data {
 	struct pwm_device	*pwm;
 	struct device		*dev;
@@ -31,12 +40,50 @@ struct pwm_bl_data {
 	int			(*check_fb)(struct device *, struct fb_info *);
 };
 
+#if defined(FEATURE_WILLOW_BACKLIGHT)
+struct pwm_bl_data *g_pb;
+int willow_backlight_ctrl=0;
+int cu_brightness=0;
+int max_brightness=0;
+extern void LTN101AL03_backlight_onoff(int onoff);
+extern void LTN101AL03_backlight_crtl(int onoff);
+
+void set_backlight_ctrl(int ctrl_b)
+{
+	willow_backlight_ctrl=ctrl_b;
+}
+EXPORT_SYMBOL(set_backlight_ctrl);
+
+void willow_backlight_on(void)
+{
+		int brightness =cu_brightness;
+		int max = max_brightness;
+		LTN101AL03_backlight_crtl(0);
+#ifdef FEATURE_WILLOW_BACKLIGHT
+		brightness = (brightness * (g_pb->period - g_pb->lth_brightness) / max);
+#else
+		brightness = g_pb->lth_brightness +
+			(brightness * (g_pb->period - g_pb->lth_brightness) / max);
+#endif
+		pwm_config(g_pb->pwm, brightness, g_pb->period);
+		pwm_enable(g_pb->pwm);
+		pwm_log(" pwm backlight  on\n");		
+}
+EXPORT_SYMBOL(willow_backlight_on);
+#endif
+
 static int pwm_backlight_update_status(struct backlight_device *bl)
 {
 	struct pwm_bl_data *pb = dev_get_drvdata(&bl->dev);
 	int brightness = bl->props.brightness;
 	int max = bl->props.max_brightness;
 
+#if defined(FEATURE_WILLOW_BACKLIGHT)
+	pwm_log("pwm backlight value = %d \n",brightness);
+	g_pb=pb;
+	cu_brightness=brightness;
+	max_brightness=max;
+#endif
 	if (bl->props.power != FB_BLANK_UNBLANK)
 		brightness = 0;
 
@@ -50,8 +97,12 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
 		pwm_config(pb->pwm, 0, pb->period);
 		pwm_disable(pb->pwm);
 	} else {
-		brightness = pb->lth_brightness +
-			(brightness * (pb->period - pb->lth_brightness) / max);
+#ifdef FEATURE_WILLOW_BACKLIGHT
+		brightness = (brightness * (g_pb->period - g_pb->lth_brightness) / max);
+#else
+		brightness = g_pb->lth_brightness +
+			(brightness * (g_pb->period - g_pb->lth_brightness) / max);
+#endif
 		pwm_config(pb->pwm, brightness, pb->period);
 		pwm_enable(pb->pwm);
 	}
@@ -84,6 +135,12 @@ static int pwm_backlight_probe(struct platform_device *pdev)
 	struct backlight_device *bl;
 	struct pwm_bl_data *pb;
 	int ret;
+
+#if defined(FEATURE_WILLOW_BACKLIGHT)
+	willow_backlight_ctrl=0;
+	cu_brightness=0;
+	max_brightness=0;	
+#endif
 
 	if (!data) {
 		dev_err(&pdev->dev, "failed to find platform data\n");

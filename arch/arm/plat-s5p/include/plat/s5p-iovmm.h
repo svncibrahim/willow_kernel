@@ -11,7 +11,7 @@
 #ifndef __ASM_PLAT_IOVMM_H
 #define __ASM_PLAT_IOVMM_H
 
-#ifdef CONFIG_ION
+#ifdef CONFIG_IOVMM
 int iovmm_setup(struct device *dev);
 void iovmm_cleanup(struct device *dev);
 int iovmm_activate(struct device *dev);
@@ -50,6 +50,6 @@ void iovmm_unmap(struct device *dev, dma_addr_t iova);
 #define iovmm_deactivate(dev)
 #define iovmm_map(dev, sg)	(0)
 #define iovmm_unmap(dev, iova)
-#endif /* CONFIG_ION */
+#endif /* CONFIG_IOVMM */
 
 #endif /*__ASM_PLAT_IOVMM_H*/

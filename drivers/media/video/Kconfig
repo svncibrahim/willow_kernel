@@ -978,6 +978,18 @@ config SOC_CAMERA_MT9V022
 	help
 	  This driver supports MT9V022 cameras from Micron
 
+config VIDEO_MT9M113
+	tristate "MT9M113 Camera Sensor"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This driver supports MT9M113 Camera module
+
+config VIDEO_AS0260
+	tristate "AS0260 supporting camera driver"
+	depends on VIDEO_V4L2 && (VIDEO_FIMC_MIPI || VIDEO_S5P_MIPI_CSIS) && VIDEO_EXYNOS_FIMC_IS
+	---help---
+	  This driver supports AS0260 sensor.
+
 config SOC_CAMERA_RJ54N1
 	tristate "rj54n1cb0c support"
 	depends on SOC_CAMERA && I2C
